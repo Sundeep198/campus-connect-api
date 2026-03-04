@@ -209,6 +209,15 @@ marks: existing ? existing.marks : ""
 });
 
 sheet.views = [{state:'frozen', ySplit:1}];
+res.setHeader(
+  "Content-Type",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+);
+
+res.setHeader(
+  "Content-Disposition",
+  "attachment; filename=marks-template.xlsx"
+);
 await workbook.xlsx.write(res);
 res.end();
 
@@ -270,6 +279,15 @@ marks: existing ? existing.marks : ""
 });
 
 sheet.views = [{state:'frozen', ySplit:1}];
+res.setHeader(
+  "Content-Type",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+);
+
+res.setHeader(
+  "Content-Disposition",
+  "attachment; filename=marks-template.xlsx"
+);
 await workbook.xlsx.write(res);
 res.end();
 
