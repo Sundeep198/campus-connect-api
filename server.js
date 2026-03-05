@@ -390,17 +390,23 @@ const rows = req.body.data;
 
 let success = 0;
 let updated = 0;
+let errorCount = 0;
 
 for(const row of rows){
 
 const {studentID,subject,marks,staffName} = row;
+
+if(!studentID || !subject || marks==null){
+errorCount++;
+continue;
+}
 
 let existing = await db.query(
 "SELECT * FROM marks WHERE studentID=? AND subject=? AND staffName=?",
 [studentID,subject,staffName]
 );
 
-if(existing.length > 0){
+if(existing.length>0){
 
 await db.query(
 "UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
@@ -422,10 +428,13 @@ success++;
 
 }
 
-res.json({successCount:success,updateCount:updated});
-
+res.json({
+successCount:success,
+updateCount:updated,
+errorCount:errorCount
 });
 
+});
 
 // ======================
 // START SERVER
