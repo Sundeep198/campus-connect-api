@@ -39,32 +39,41 @@ connectDB();
 // GET ROUTES
 // ======================
 
-app.get('/students', (req, res) => {
-    db.query("SELECT * FROM students", (err, results) => {
-        if (err) return res.status(500).json(err);
-        res.json(results);
-    });
+app.get('/students', async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM students");
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({error: err.message});
+    }
 });
 
-app.get('/staff', (req, res) => {
-    db.query("SELECT * FROM staff", (err, results) => {
-        if (err) return res.status(500).json(err);
-        res.json(results);
-    });
+app.get('/staff', async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM staff");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({error: err.message});
+    }
 });
 
-app.get('/staffusers', (req, res) => {
-    db.query("SELECT * FROM staff_users", (err, results) => {
-        if (err) return res.status(500).json(err);
-        res.json(results);
-    });
+app.get('/staffusers', async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM staff_users");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({error: err.message});
+    }
 });
 
-app.get('/marks', (req, res) => {
-    db.query("SELECT * FROM marks", (err, results) => {
-        if (err) return res.status(500).json(err);
-        res.json(results);
-    });
+app.get('/marks', async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM marks");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({error: err.message});
+    }
 });
 
 
@@ -113,40 +122,57 @@ app.post('/students/delete', (req, res) => {
 // MARKS ROUTES
 // ======================
 
-app.post('/marks/add', (req, res) => {
+app.post('/marks/add', async (req, res) => {
+  try {
     const { studentID, subject, marks, staffName, status } = req.body;
-    db.query(
-        "INSERT INTO marks (studentID, subject, marks, staffName, status) VALUES (?, ?, ?, ?, ?)",
-        [studentID, subject, marks, staffName, status],
-        (err) => {
-            if (err) return res.status(500).json({ success:false, error: err.message });
-            res.json({ success:true });
-        }
+
+    await db.query(
+      "INSERT INTO marks (studentID, subject, marks, staffName, status) VALUES (?, ?, ?, ?, ?)",
+      [studentID, subject, marks, staffName, status]
     );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success:false, error: err.message });
+  }
 });
 
-app.post('/marks/update', (req, res) => {
+
+app.post('/marks/update', async (req, res) => {
+  try {
     const { studentID, subject, status, notes, meeting } = req.body;
-    db.query(
-        "UPDATE marks SET status=?, notes=?, meeting=? WHERE studentID=? AND subject=?",
-        [status, notes, meeting, studentID, subject],
-        (err) => {
-            if (err) return res.status(500).json({ success:false, error: err.message });
-            res.json({ success:true });
-        }
+
+    await db.query(
+      "UPDATE marks SET status=?, notes=?, meeting=? WHERE studentID=? AND subject=?",
+      [status, notes, meeting, studentID, subject]
     );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success:false, error: err.message });
+  }
 });
 
-app.post('/marks/updateMarks', (req, res) => {
+
+app.post('/marks/updateMarks', async (req, res) => {
+  try {
     const { studentID, subject, staffName, marks } = req.body;
-    db.query(
-        "UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
-        [marks, studentID, subject, staffName],
-        (err) => {
-            if (err) return res.status(500).json({ success:false, error: err.message });
-            res.json({ success:true });
-        }
+
+    await db.query(
+      "UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
+      [marks, studentID, subject, staffName]
     );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success:false, error: err.message });
+  }
 });
 
 
@@ -154,16 +180,21 @@ app.post('/marks/updateMarks', (req, res) => {
 // STAFF ROUTES
 // ======================
 
-app.post('/staff/update', (req, res) => {
+app.post('/staff/update', async (req, res) => {
+  try {
     const { name, availability, block, room, date, startTime, duration, endTime } = req.body;
-    db.query(
-        "UPDATE staff SET availability=?, block=?, room=?, date=?, startTime=?, duration=?, endTime=? WHERE name=?",
-        [availability, block, room, date, startTime, duration, endTime, name],
-        (err) => {
-            if (err) return res.status(500).json({ success:false, error: err.message });
-            res.json({ success:true });
-        }
+
+    await db.query(
+      "UPDATE staff SET availability=?, block=?, room=?, date=?, startTime=?, duration=?, endTime=? WHERE name=?",
+      [availability, block, room, date, startTime, duration, endTime, name]
     );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success:false, error: err.message });
+  }
 });
 
 app.get("/marks/template-full", async (req,res)=>{
@@ -355,36 +386,45 @@ res.status(500).json({error:"Upload failed"});
 
 app.post("/marks/bulkUploadJSON", async (req,res)=>{
 
-let rows=req.body.data;
+const rows = req.body.data;
 
-let success=0,updated=0,errorRows=[];
+let success = 0;
+let updated = 0;
 
-for(let row of rows){
+for(const row of rows){
 
-let {studentID,subject,marks}=row;
+const {studentID,subject,marks,staffName} = row;
 
 let existing = await db.query(
 "SELECT * FROM marks WHERE studentID=? AND subject=? AND staffName=?",
-[studentID,subject,row.staffName]
+[studentID,subject,staffName]
 );
 
-if(existing.length>0){
+if(existing.length > 0){
+
 await db.query(
 "UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
-[marks,studentID,subject,row.staffName]
+[marks,studentID,subject,staffName]
 );
+
 updated++;
+
 }else{
+
 await db.query(
 "INSERT INTO marks(studentID,subject,marks,staffName,status) VALUES(?,?,?,?, 'Pending')",
-[studentID,subject,marks,row.staffName]
+[studentID,subject,marks,staffName]
 );
+
 success++;
+
 }
+
 }
 
 res.json({successCount:success,updateCount:updated});
-}); 
+
+});
 
 
 // ======================
