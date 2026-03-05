@@ -351,23 +351,23 @@ errorRows.push(row);
 continue;
 }
 
-let existing = await db.query(
-"SELECT * FROM marks WHERE studentID=? AND subject=?",
-[id,subject]
+const [existing] = await db.query(
+"SELECT * FROM marks WHERE studentID=? AND subject=? AND staffName=?",
+[studentID, subject, row.staffName]
 );
 
-if(existing.rows.length>0){
-await db.query(
-"UPDATE marks SET marks=? WHERE studentID=? AND subject=?",
-[marks,id,subject]
-);
-updated++;
+if(existing.length > 0){
+   await db.query(
+   "UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
+   [marks, studentID, subject, row.staffName]
+   );
+   updated++;
 }else{
-await db.query(
-"INSERT INTO marks(studentID,subject,marks,status) VALUES(?,?,?,'Pending')",
-[id,subject,marks]
-);
-success++;
+   await db.query(
+   "INSERT INTO marks(studentID,subject,marks,staffName,status) VALUES(?,?,?,?, 'Pending')",
+   [studentID, subject, marks, row.staffName]
+   );
+   success++;
 }
 }
 
