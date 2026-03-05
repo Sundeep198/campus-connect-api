@@ -328,6 +328,7 @@ res.end();
 app.post("/marks/bulkUpload", upload.single("file"), async (req,res)=>{
 try {
 
+const staffName = req.body.staffName;   // ✅ ADD HERE
 const workbook = XLSX.read(req.file.buffer,{type:"buffer"});
 const sheet = workbook.Sheets["MarksEntry"];
 
@@ -342,32 +343,34 @@ let success=0,updated=0,errorRows=[];
 
 for(let row of rows){
 
-let id=row["Student ID"];
-let subject=row["Subject"];
-let marks=parseInt(row["Marks"]);
+let id = row["Student ID"];
+let subject = row["Subject"];
+let marks = parseInt(row["Marks"]);
 
-if(!id || !subject || isNaN(marks) || marks<0 || marks>100){
+if(!id || !subject || isNaN(marks) || marks < 0 || marks > 100){
 errorRows.push(row);
 continue;
 }
 
 const [existing] = await db.query(
 "SELECT * FROM marks WHERE studentID=? AND subject=? AND staffName=?",
-[studentID, subject, row.staffName]
+[id, subject, staffName]
 );
 
 if(existing.length > 0){
-   await db.query(
-   "UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
-   [marks, studentID, subject, row.staffName]
-   );
-   updated++;
+
+await db.query(
+"UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
+[marks, id, subject, staffName]
+);
+
 }else{
-   await db.query(
-   "INSERT INTO marks(studentID,subject,marks,staffName,status) VALUES(?,?,?,?, 'Pending')",
-   [studentID, subject, marks, row.staffName]
-   );
-   success++;
+
+await db.query(
+"INSERT INTO marks(studentID,subject,marks,staffName,status) VALUES(?,?,?,?, 'Pending')",
+[id, subject, marks, staffName]
+);
+
 }
 }
 
@@ -401,12 +404,12 @@ errorCount++;
 continue;
 }
 
-let existing = await db.query(
+const [existing] = await db.query(
 "SELECT * FROM marks WHERE studentID=? AND subject=? AND staffName=?",
 [studentID,subject,staffName]
 );
 
-if(existing.length>0){
+if(existing.length > 0){
 
 await db.query(
 "UPDATE marks SET marks=? WHERE studentID=? AND subject=? AND staffName=?",
@@ -425,7 +428,6 @@ await db.query(
 success++;
 
 }
-
 }
 
 res.json({
