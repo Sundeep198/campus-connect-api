@@ -13,31 +13,45 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ MySQL Connection (Promise Version)
-let db;
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  ssl: process.env.DB_HOST?.includes("railway") 
+      ? { rejectUnauthorized: false } 
+      : undefined
+});
 
-async function connectDB() {
+(async () => {
   try {
-    db = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      port: process.env.DB_PORT,
-      ssl: { rejectUnauthorized: false }
-    });
-
-    console.log("✅ Connected to Railway MySQL");
+    const [rows] = await db.query("SELECT 1");
+    console.log("✅ Database Connected Successfully");
   } catch (err) {
-    console.error("Database connection failed:", err);
+    console.error("❌ Database Connection Failed:", err);
   }
-}
+})();
 
-connectDB();
-
+app.get("/debug/tables", async (req,res)=>{
+  try{
+    const [rows] = await db.query("SHOW TABLES");
+    res.json(rows);
+  }catch(err){
+    res.json(err);
+  }
+});
 
 // ======================
 // GET ROUTES
 // ======================
+
+app.get("/", (req,res)=>{
+  res.send("Campus Connect API Running");
+});
 
 app.get('/students', async (req, res) => {
     try {
@@ -59,12 +73,22 @@ app.get('/staff', async (req, res) => {
 });
 
 app.get('/staffusers', async (req, res) => {
-    try {
-        const [rows] = await db.query("SELECT * FROM staff_users");
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({error: err.message});
-    }
+  try {
+
+    const [rows] = await db.query("SELECT * FROM staff_users");
+
+    res.json(rows);
+
+  } catch (err) {
+
+    console.error("Staff Users Error:", err);
+
+    res.status(500).json({
+      success:false,
+      error: err.message
+    });
+
+  }
 });
 
 app.get('/marks', async (req, res) => {
@@ -81,40 +105,55 @@ app.get('/marks', async (req, res) => {
 // STUDENT ROUTES
 // ======================
 
-app.post('/students/add', (req, res) => {
+app.post('/students/add', async (req, res) => {
+  try {
+
     const { id, username, password, name } = req.body;
-    db.query(
-        "INSERT INTO students (id, username, password, name) VALUES (?, ?, ?, ?)",
-        [id, username, password, name],
-        (err) => {
-            if (err) return res.status(500).json({ success:false, error: err.message });
-            res.json({ success:true });
-        }
+
+    await db.query(
+      "INSERT INTO students (id, username, password, name) VALUES (?, ?, ?, ?)",
+      [id, username, password, name]
     );
+
+    res.json({ success:true });
+
+  } catch(err) {
+    res.status(500).json({ success:false, error: err.message });
+  }
 });
 
-app.post('/students/update', (req, res) => {
+app.post('/students/update', async (req, res) => {
+  try {
+
     const { id, username, password, name } = req.body;
-    db.query(
-        "UPDATE students SET username=?, password=?, name=? WHERE id=?",
-        [username, password, name, id],
-        (err) => {
-            if (err) return res.status(500).json({ success:false, error: err.message });
-            res.json({ success:true });
-        }
+
+    await db.query(
+      "UPDATE students SET username=?, password=?, name=? WHERE id=?",
+      [username, password, name, id]
     );
+
+    res.json({ success:true });
+
+  } catch(err) {
+    res.status(500).json({ success:false, error: err.message });
+  }
 });
 
-app.post('/students/delete', (req, res) => {
+app.post('/students/delete', async (req, res) => {
+  try {
+
     const { id } = req.body;
-    db.query(
-        "DELETE FROM students WHERE id=?",
-        [id],
-        (err) => {
-            if (err) return res.status(500).json({ success:false, error: err.message });
-            res.json({ success:true });
-        }
+
+    await db.query(
+      "DELETE FROM students WHERE id=?",
+      [id]
     );
+
+    res.json({ success:true });
+
+  } catch(err) {
+    res.status(500).json({ success:false, error: err.message });
+  }
 });
 
 
@@ -199,7 +238,6 @@ app.post('/staff/update', async (req, res) => {
 
 app.get("/marks/template-full", async (req,res)=>{
 
-const ExcelJS = require("exceljs");
 
 let workbook = new ExcelJS.Workbook();
 let sheet = workbook.addWorksheet("MarksEntry");
@@ -256,7 +294,6 @@ res.end();
 
 app.get("/marks/template-staff", async (req,res)=>{
 
-const ExcelJS = require("exceljs");
 
 let staffName = req.query.staffName;
 
@@ -328,7 +365,12 @@ res.end();
 app.post("/marks/bulkUpload", upload.single("file"), async (req,res)=>{
 try {
 
-const staffName = req.body.staffName;   // ✅ ADD HERE
+const staffName = req.body.staffName;
+
+if(!req.file){
+return res.status(400).json({error:"No file uploaded"});
+}
+
 const workbook = XLSX.read(req.file.buffer,{type:"buffer"});
 const sheet = workbook.Sheets["MarksEntry"];
 
@@ -364,12 +406,16 @@ await db.query(
 [marks, id, subject, staffName]
 );
 
+updated++;
+
 }else{
 
 await db.query(
 "INSERT INTO marks(studentID,subject,marks,staffName,status) VALUES(?,?,?,?, 'Pending')",
 [id, subject, marks, staffName]
 );
+
+success++;
 
 }
 }
@@ -388,6 +434,10 @@ res.status(500).json({error:"Upload failed"});
 });
 
 app.post("/marks/bulkUploadJSON", async (req,res)=>{
+
+if(!req.body.data){
+return res.status(400).json({error:"No data provided"});
+}
 
 const rows = req.body.data;
 
@@ -441,6 +491,14 @@ errorCount:errorCount
 // ======================
 // START SERVER
 // ======================
+
+app.use((err, req, res, next) => {
+console.error("Unhandled Error:", err);
+res.status(500).json({
+success:false,
+error:"Internal Server Error"
+});
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
